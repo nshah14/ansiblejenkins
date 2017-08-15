@@ -1,0 +1,115 @@
+---
+# tasks file for jenkins
+# sudo wget -O /etc/yum.repos.d/jenkins.repo http://pkg.jenkins-ci.org/redhat/jenkins.repo
+# sudo rpm --import https://jenkins-ci.org/redhat/jenkins-ci.org.key
+# sudo yum install jenkins
+# Sometimes I want to run this with Vagrant
+
+# Add apt keys
+- name: add key for ppa python repository
+  apt_key: keyserver=keyserver.ubuntu.com id=DB82666C state=present
+  become: yes
+  become_user: root
+  become_method: sudo
+
+# Add extra repositories
+- name: Add ppa python repository
+  apt_repository: repo='deb http://ppa.launchpad.net/fkrull/deadsnakes-python2.7/ubuntu {{ ansible_distribution_release }} main' state=present update_cache=yes
+  become: yes
+  become_user: root
+  become_method: sudo
+
+# Update python version
+- name: ensure python2.7 tatest  is installed
+  apt:
+    pkg: python2.7
+    state: latest
+    install_recommends: no
+  become: yes
+  become_user: root
+  become_method: sudo
+  
+- name: Install add-apt-repostory
+  become: yes
+  apt: name=software-properties-common state=latest
+
+- name: Add Oracle Java Repository
+  become: yes
+  apt_repository: repo='ppa:webupd8team/java'
+
+- name: Accept Java 8 License
+  become: yes
+  debconf: name='oracle-java8-installer' question='shared/accepted-oracle-license-v1-1' value='true' vtype='select'
+
+- name: Install Oracle Java 8
+  become: yes
+  apt: name={{item}} state=latest
+  with_items:
+    - oracle-java8-installer
+    - ca-certificates
+    - oracle-java8-set-default
+
+- name: Update apt cache.
+  apt: update_cache=yes cache_valid_time=3600
+
+- name: Add jenkins apt-key
+  apt_key: url=https://jenkins-ci.org/debian/jenkins-ci.org.key state=present
+  tags: jenkins
+
+- name: Add Jenkins repository
+  apt_repository: repo='deb http://pkg.jenkins-ci.org/debian binary/' state=present update_cache=yes
+  tags: jenkins
+
+- name: Install Jenkins package
+  apt: pkg=jenkins state=latest  
+  register: jenkins_install
+  tags: jenkins
+
+- name: Wait for Jenkins startup
+  wait_for: port=8080 delay=15
+  when: jenkins_install.changed
+  tags: jenkins
+
+- name: Create Jenkins CLI destination directory
+  file: path=/usr/share/jenkins-cli state=directory
+  tags: jenkins
+
+- name: Get Jenkins CLI
+  get_url: url=http://localhost:8080/jnlpJars/jenkins-cli.jar dest=/usr/share/jenkins-cli mode=0440
+  tags: jenkins
+
+# - name: Ensure Java is present
+#   yum: name={{ jenkins_jdk }} state=present
+#   when: ansible_distribution != 'Amazon'
+
+# - name: Ensure Jenkins Yum repo present
+#   get_url: url=http://pkg.jenkins-ci.org/redhat/jenkins.repo dest=/etc/yum.repos.d/jenkins.repo mode=0644
+
+# - name: Check for Jenkins GPG in rpmdb
+#   command: rpm -q {{ jenkins_key }}
+#   register: keycheck
+#   ignore_errors: true
+
+# - name: Ensure Jenkins GPG key installed
+#   command: rpm --import http://pkg.jenkins-ci.org/redhat/jenkins-ci.org.key
+#   when: keycheck|failed
+
+# - name: Ensure Jenkins installed
+#   yum: name=jenkins state=present
+
+# - name: "Start Jenkins"
+#   service: name="jenkins" state="started"
+
+# - name: "Wait for Jenkins to come up"
+#   uri:
+#     url: "{{ item.public_dns_name }}:8080"
+#     status_code: 200
+#   with_items: ec2.instances
+#   register: result
+#   until: result.status == 200
+#   retries: 60
+#   delay: 1
+
+# - name: Ensure Jenkins is running
+#   service: name=jenkins state=running enabled=true
+
