@@ -7,8 +7,6 @@
       ami:      ami-daae8bbf
       set_dns:  False
       instance: t2.micro
-      aws_access_key: AKIAIQW2FCECVZ3NW2LQ
-      aws_secret_key: 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
       security_group: jenkinssg
   connection: local
   gather_facts: false
